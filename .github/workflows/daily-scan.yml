@@ -9,13 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+
       - name: Install dependencies
         run: |
-          pip install yfinance pandas_ta pandas numpy
+          python -m pip install --upgrade pip
+          pip install yfinance pandas-ta pandas numpy
+
+          
       - name: Run scanner
         run: |
           python scanner.py
