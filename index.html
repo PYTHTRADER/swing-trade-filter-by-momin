@@ -1,1 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Swing Scanner — Signals</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Inter,system-ui,Arial;margin:18px;background:#0b1020;color:#e6eef8}
+    h1{font-size:20px;margin-bottom:6px}
+    .meta{color:#9fb0d7;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;background:#071028}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left}
+    th{background:#041225;color:#9ec5ff;font-weight:600}
+    tr:hover td{background:rgba(255,255,255,0.01)}
+    .empty{color:#9fb0d7;padding:20px;background:#071725;border-radius:6px}
+    .small{font-size:12px;color:#98b6d8}
+  </style>
+</head>
+<body>
+  <h1>Swing Scanner — Latest Signals</h1>
+  <div class="meta small">This page loads <code>/signals.json</code> from the repository and shows latest signals. Auto-refresh every 60s.</div>
+  <div id="content"><div class="empty">Loading signals…</div></div>
+
+<script>
+async function fetchAndRender(){
+  const content = document.getElementById('content');
+  try{
+    const res = await fetch('/signals.json', {cache: "no-store"});
+    if(!res.ok) throw new Error('No signals.json found (HTTP ' + res.status + ')');
+    const data = await res.json();
+    const signals = (data.signals && data.signals.length) ? data.signals : [];
+    const gen = data.date || data.generated_at || (new Date()).toISOString();
+
+    if(signals.length === 0){
+      content.innerHTML = `<div class="empty">No signals found for <strong>${new Date(gen).toLocaleString()}</strong>.</div>`;
+      return;
+    }
+
+    let html = `<div class="small">Generated: ${new Date(gen).toLocaleString()}</div>`;
+    html += `<table><thead><tr>
+      <th>Ticker</th><th>Setup</th><th>Entry</th><th>Stoploss</th><th>Target</th><th>RSI</th><th>RVol</th><th>Exp%</th>
+    </tr></thead><tbody>`;
+
+    signals.forEach(s=>{
+      html += `<tr>
+        <td>${s.ticker || ''}</td>
+        <td>${s.setup || ''}</td>
+        <td>${s.entry ?? ''}</td>
+        <td>${s.stoploss ?? ''}</td>
+        <td>${s.target1 ?? ''}</td>
+        <td>${s.rsi ?? ''}</td>
+        <td>${s.rvol ?? ''}</td>
+        <td>${s.expected_move_pct ?? ''}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    content.innerHTML = html;
+  }catch(e){
+    content.innerHTML = `<div class="empty">Error loading signals: ${e.message}</div>`;
+  }
+}
+fetchAndRender();
+setInterval(fetchAndRender, 60000);
+</script>
+</body>
+</html>
 
