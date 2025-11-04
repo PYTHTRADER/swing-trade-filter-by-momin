@@ -1,16 +1,23 @@
 name: Daily Swing Scan
+
+# Give the runner permission to push files back to the repo
+permissions:
+  contents: write
+
 on:
   schedule:
-    - cron: '30 13 * * 1-5' # runs 7:00 PM IST Mon–Fri
+    - cron: '30 13 * * 1-5' # runs at 13:30 UTC Mon-Fri (adjust as needed)
   workflow_dispatch: {}
 
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true   # ensure GITHUB_TOKEN is available for push
 
-      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -21,16 +28,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance pandas-ta pandas numpy
 
-          
       - name: Run scanner
         run: |
-           python scanner/scanner.py
+          python scanner/scanner.py
 
-
-          
       - name: Commit result
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "update signals"
           file_pattern: "signals.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
