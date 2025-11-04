@@ -1,27 +1,35 @@
-# swing scanner script
-def compute_indicators(df):
-    # EMA using pandas ewm
-    df['ema20'] = df['Close'].ewm(span=EMA_SHORT, adjust=False).mean()
-    df['ema50'] = df['Close'].ewm(span=EMA_LONG, adjust=False).mean()
+import yfinance as yf
+import pandas_ta as ta
+import pandas as pd, numpy as np, json, time
+from datetime import datetime, timedelta
 
-    # Use 'ta' library for indicators
-    import ta
+TICKERS = ['TCS.NS','HDFCBANK.NS','RELIANCE.NS','IRCTC.NS','BEL.NS','CAMS.NS','TATAMOTORS.NS','COFORGE.NS','IRFC.NS']
+LOOKBACK_DAYS = 90
+RVOL_THRESHOLD = 1.8
+RSI_BUY = 55
 
-    # RSI (14)
-    df['rsi14'] = ta.momentum.rsi(df['Close'], window=14, fillna=True)
+def fetch(ticker):
+    end=datetime.now(); start=end-timedelta(days=LOOKBACK_DAYS)
+    df=yf.download(ticker,start=start,end=end,progress=False)
+    if df.empty: return None
+    df['rsi']=ta.rsi(df['Close'],14)
+    df['ema20']=ta.ema(df['Close'],20)
+    df['vol20']=df['Volume'].rolling(20).mean()
+    df['recent_high']=df['High'].rolling(10).max()
+    last=df.iloc[-1]
+    rvol=last['Volume']/last['vol20']
+    if last['Close']>last['recent_high'] and last['rsi']>RSI_BUY and rvol>RVOL_THRESHOLD:
+        return {'ticker':ticker.replace('.NS',''),'price':round(last['Close'],2),'rsi':round(last['rsi'],2),'rvol':round(rvol,2)}
+    return None
 
-    # MACD (12,26,9)
-    df['macd'] = ta.trend.macd(df['Close'], window_slow=26, window_fast=12, fillna=True)
-    df['macd_signal'] = ta.trend.macd_signal(df['Close'], window_slow=26, window_fast=12, window_sign=9, fillna=True)
-    df['MACDh_12_26_9'] = df['macd'] - df['macd_signal']
+res=[]
+for t in TICKERS:
+    try:
+        sig=fetch(t)
+        if sig: res.append(sig)
+        time.sleep(0.5)
+    except: pass
 
-    # ATR (14)
-    df['atr14'] = ta.volatility.average_true_range(high=df['High'], low=df['Low'], close=df['Close'], window=14, fillna=True)
-
-    # 20-day avg volume for RVOL
-    df['vol20'] = df['Volume'].rolling(window=20, min_periods=10).mean()
-
-    # recent highs/lows
-    df['recent_high_10'] = df['High'].rolling(window=10, min_periods=5).max()
-    df['recent_low_10'] = df['Low'].rolling(window=10, min_periods=5).min()
-    return df
+with open("signals.json","w") as f:
+    json.dump({'date':datetime.utcnow().isoformat(),'signals':res},f,indent=2)
+print("Saved",len(res),"signals")
