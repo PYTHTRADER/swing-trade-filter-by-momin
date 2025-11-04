@@ -1,1 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Swing Scanner — Signals</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#071026;--card:#081728;--muted:#9fb0d7;--accent:#9ec5ff;color-scheme:dark}
+    html,body{height:100%;margin:0;background:#050717;font-family:Inter,system-ui,Arial;color:#e6eef8}
+    .wrap{max-width:980px;margin:28px auto;padding:20px}
+    h1{margin:0 0 8px;font-size:20px}
+    .meta{color:var(--muted);margin-bottom:18px;font-size:13px}
+    .box{background:var(--card);padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+    .empty{color:var(--muted);padding:18px;border-radius:6px;background:rgba(255,255,255,0.02)}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left;font-size:14px}
+    th{background:rgba(255,255,255,0.02);color:var(--accent);font-weight:600}
+    .small{font-size:12px;color:var(--muted)}
+    .err{color:#ff9b9b;background:rgba(255,155,155,0.04);padding:10px;border-radius:6px;margin-top:10px}
+    .muted-line{color:var(--muted);font-size:13px;margin-top:8px}
+    footer{margin-top:18px;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Swing Scanner — Latest Signals</h1>
+    <div class="meta small">This page attempts to load <code>/signals.json</code> from the Pages site, and falls back to the raw GitHub file if needed. Auto-refresh every 60s.</div>
 
+    <div id="main" class="box">
+      <div id="content"><div class="empty">Loading signals…</div></div>
+      <div id="error" style="display:none" class="err"></div>
+      <div id="debug" class="muted-line small" style="margin-top:12px"></div>
+    </div>
+
+    <footer>If you see "Error loading signals" — open DevTools (F12) → Console and copy errors here for me.</footer>
+  </div>
+
+<script>
+(function(){
+  const DEBUG = true;
+  const RAW_URL = 'https://raw.githubusercontent.com/PYHTHRADER/swing-trade-filter-by-momin/main/signals.json';
+  const PAGES_PATH = '/signals.json'; // site-relative first attempt
+
+  function logDebug(msg){
+    if(!DEBUG) return;
+    try{
+      const el = document.getElementById('debug');
+      el.textContent = (el.textContent? el.textContent + ' | ' : '') + msg;
+      console.log('[scanner-debug]', msg);
+    }catch(e){ console.log('[scanner-debug]', msg, e); }
+  }
+
+  async function tryFetch(url){
+    logDebug('trying ' + url);
+    try{
+      const res = await fetch(url, {cache: 'no-store'});
+      logDebug('status ' + res.status + ' for ' + url);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      return {ok:true, data};
+    }catch(err){
+      logDebug('fetch failed ' + url + ' -> ' + err.message);
+      return {ok:false, error: err.message};
+    }
+  }
+
+  async function fetchSignals(){
+    // Try Pages path first
+    let r = await tryFetch(PAGES_PATH);
+    if(r.ok) return r.data;
+
+    // Fallback to raw github content
+    r = await tryFetch(RAW_URL);
+    if(r.ok) return r.data;
+
+    // both failed
+    throw new Error('Could not load signals from pages or raw repo');
+  }
+
+  function renderEmpty(gen){
+    const content = document.getElementById('content');
+    content.innerHTML = `<div class="empty">No signals found for <strong>${new Date(gen).toLocaleString()}</strong>.</div>`;
+  }
+
+  function renderSignals(data){
+    const content = document.getElementById('content');
+    const signals = (data.signals && data.signals.length) ? data.signals : [];
+    const gen = data.date || data.generated_at || new Date().toISOString();
+
+    if(!signals.length){
+      renderEmpty(gen);
+      return;
+    }
+
+    let html = `<div class="small">Generated: ${new Date(gen).toLocaleString()}</div>`;
+    html += `<table><thead><tr>
+      <th>Ticker</th><th>Setup</th><th>Entry</th><th>Stoploss</th><th>Target</th><th>RSI</th><th>RVol</th><th>Exp%</th>
+    </tr></thead><tbody>`;
+    signals.forEach(s=>{
+      html += `<tr>
+        <td>${s.ticker || ''}</td>
+        <td>${s.setup || ''}</td>
+        <td>${s.entry ?? ''}</td>
+        <td>${s.stoploss ?? ''}</td>
+        <td>${s.target1 ?? ''}</td>
+        <td>${s.rsi ?? ''}</td>
+        <td>${s.rvol ?? ''}</td>
+        <td>${s.expected_move_pct ?? ''}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    content.innerHTML = html;
+  }
+
+  async function fetchAndRender(){
+    const errEl = document.getElementById('error');
+    errEl.style.display = 'none'; errEl.textContent = '';
+    try{
+      const data = await fetchSignals();
+      renderSignals(data);
+      logDebug('rendered signals OK');
+    }catch(e){
+      // show friendly error + console info
+      document.getElementById('content').innerHTML = `<div class="empty">Error loading signals: <strong>${e.message}</strong></div>`;
+      errEl.style.display = 'block';
+      errEl.textContent = 'Page could not read signals.json. Open DevTools → Console for details.';
+      console.error('[swing-scanner] fetch error:', e);
+      logDebug('final error: ' + e.message);
+    }
+  }
+
+  // initial load + interval
+  fetchAndRender();
+  setInterval(fetchAndRender, 60000);
+})();
+</script>
+</body>
+</html>
