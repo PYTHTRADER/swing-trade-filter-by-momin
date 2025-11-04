@@ -1,0 +1,33 @@
+name: Daily Swing Scan
+on:
+  schedule:
+    - cron: '13 13 * * 1-5'  # runs daily at 18:43 IST (13:13 UTC)
+  workflow_dispatch: {}
+
+jobs:
+  run-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scanner/requirements.txt
+
+      - name: Run scanner
+        run: |
+          python scanner/scanner.py
+
+      - name: Commit signals to docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          git add docs/signals.json docs/signals.csv || true
+          git commit -m "daily signals $(date +'%Y-%m-%d')" || echo "no changes"
+          git push || echo "push failed"
+
